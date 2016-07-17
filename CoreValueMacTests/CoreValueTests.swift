@@ -30,6 +30,7 @@ struct Employee : CVManagedStruct {
 }
 
 struct StoredShopEmployee : CVManagedPersistentStruct {
+    typealias StructureType = StoredShopEmployee
     
     static let EntityName = "Employee"
     
@@ -116,6 +117,7 @@ struct Other: CVManagedStruct {
 }
 
 struct StoredShop: CVManagedPersistentStruct {
+    typealias StructureType = StoredShop
     static let EntityName = "Shop"
     
     var objectID: NSManagedObjectID?
@@ -131,6 +133,7 @@ struct StoredShop: CVManagedPersistentStruct {
 }
 
 struct StoredEmployeeShop: CVManagedPersistentStruct {
+    typealias StructureType = StoredEmployeeShop
     static let EntityName = "Shop"
     
     var objectID: NSManagedObjectID?
@@ -143,6 +146,24 @@ struct StoredEmployeeShop: CVManagedPersistentStruct {
             <^> o <| "name"
             <^> o <|| "employees"
     }
+    
+    mutating func mutatingToObject(context: NSManagedObjectContext?) throws -> NSManagedObject {
+        
+        let o = try self.managedObject(context)
+        
+        self = try curry(self.dynamicType.init)
+            <^> nil
+            <^> o |> ("name", self.name)
+            <^> o ||> ("employees", self.employees)
+        
+        if let ctx = context {
+            try ctx.save()
+            // if it succeeded, update the objectID
+            self.objectID = o.objectID
+        }
+        
+        return o
+    }
 }
 
 enum CarType:String{
@@ -154,6 +175,7 @@ enum CarType:String{
 extension CarType: Boxing,Unboxing {}
 
 struct Car: CVManagedPersistentStruct {
+    typealias StructureType = Car
     static let EntityName = "Car"
     var objectID: NSManagedObjectID?
     var name: String

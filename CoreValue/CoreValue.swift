@@ -68,22 +68,62 @@ public func <|| <A where A: Unboxing, A == A.StructureType>(value: NSManagedObje
     }
 }
 
-public func |> <A where A: Boxing>(object: NSManagedObject, boxed: (key: String, value: A)) throws -> NSManagedObject {
+public func |> <A where A: Boxing>(object: NSManagedObject, boxed: (key: String, value: A)) throws -> A {
     try boxed.value.box(object, withKey: boxed.key)
-    return object
+    return boxed.value
 }
 
-public func ?|> <A where A: Boxing>(object: NSManagedObject, boxed: (key: String, value: A?)) throws -> NSManagedObject {
+public func ?|> <A where A: Boxing>(object: NSManagedObject, boxed: (key: String, value: A?)) throws -> A? {
     if let value = boxed.value {
         try value.box(object, withKey: boxed.key)
     }
-    return object
+    return boxed.value
 }
 
-public func ||> <A where A: BoxingStruct>(object: NSManagedObject, boxed: (key: String, values: Array<A>)) throws -> NSManagedObject {
+public func ||> <A where A: BoxingStruct>(object: NSManagedObject, boxed: (key: String, values: Array<A>)) throws -> [A] {
     try boxed.values.box(object, withKey: boxed.key)
-    return object
+    return boxed.values
 }
+
+
+public func |> <A where A: BoxingMutating>(object: NSManagedObject, boxed: (key: String, value: A)) throws -> A {
+    var value =  boxed.value
+    try value.box(object, withKey: boxed.key)
+    return value
+}
+
+public func ?|> <A where A: BoxingMutating>(object: NSManagedObject, boxed: (key: String, value: A?)) throws -> A? {
+    if var value = boxed.value {
+        try value.box(object, withKey: boxed.key)
+        return value
+    }
+    return nil
+}
+
+public func ||> <A where A: BoxingPersistentStruct>(object: NSManagedObject, boxed: (key: String, values: Array<A>)) throws -> [A] {
+    let values:[A] = boxed.values //.map { $0 as BoxingPersistentStruct }
+    var mutatedValues: [A] = []
+    var objects: [NSManagedObject] = []
+    
+    for value in values {
+        var mutatedValue = value
+        objects.append(try mutatedValue.mutatingToObject(object.managedObjectContext))
+        mutatedValues.append(mutatedValue)
+    }
+    
+    let orderedSet = NSOrderedSet(array: objects)
+    
+    let mutableValue = object.mutableOrderedSetValueForKey(boxed.key)
+    if objects.count == 0 {
+        mutableValue.removeAllObjects()
+    } else {
+        mutableValue.intersectOrderedSet(orderedSet) // removes objects that are not in new array
+        mutableValue.unionOrderedSet(orderedSet) // adds new objects
+    }
+    
+    return mutatedValues
+}
+
 
 /**
 Each Unboxing operation returns this either type which allows unboxing to fail
@@ -118,6 +158,18 @@ public protocol Unboxing {
     static func unbox(value: AnyObject) throws -> StructureType
 }
 
+
+public protocol BoxingMutating {
+    mutating func box(object: NSManagedObject, withKey: String) throws
+}
+
+public extension Array where Element : BoxingMutating {
+    mutating func box(object: NSManagedObject, withKey: String) throws {
+        
+    }
+}
+
+
 // MARK: -
 // MARK: Boxing
 
@@ -138,7 +190,6 @@ public protocol Boxing {
     */
     func box(object: NSManagedObject, withKey: String) throws
 }
-
 public protocol BoxingStruct : Boxing {
     
     /** The name of the Core Data entity that the boxed value type should become */
@@ -175,7 +226,8 @@ extension BoxingStruct {
  type BoxingPersistentStruct
  */
 
-public protocol BoxingPersistentStruct : BoxingStruct {
+
+public protocol BoxingPersistentStruct : BoxingStruct, BoxingMutating {
     /** If this value type is based on an existing object, this is the object id, so we can
         locate it and update it in the  managedobjectstore instead of re-inserting it*/
     var objectID: NSManagedObjectID? {get set}
@@ -309,7 +361,12 @@ public protocol CVManagedStruct : _CVManagedStruct {
     associatedtype StructureType = Self
 }
 
-public typealias _CVManagedPersistentStruct = protocol<BoxingPersistentStruct, UnboxingStruct>
+
+public protocol _CVMutatingStruct: BoxingPersistentStruct {
+    associatedtype StructureType = Self
+}
+
+public typealias _CVManagedPersistentStruct = protocol<_CVMutatingStruct, UnboxingStruct>
 
 public protocol CVManagedPersistentStruct : _CVManagedPersistentStruct {
     associatedtype StructureType = Self
@@ -620,6 +677,13 @@ public extension BoxingPersistentStruct {
             return virginObjectForEntity(self.dynamicType.EntityName, context: context)
         }
     }
+    
+    public mutating func box(object: NSManagedObject, withKey: String) throws {
+        if let context = object.managedObjectContext {
+            let managedObject = try self.mutatingToObject(context)
+            object.setValue(managedObject, forKey: withKey)
+        }
+    }
 }
 
 
@@ -770,9 +834,43 @@ public extension Array where Element : BoxingStruct {
     }
 }
 
-public extension BoxingPersistentStruct {
-    mutating func mutatingToObject(context: NSManagedObjectContext?) throws -> NSManagedObject {
+public extension Array where Element : BoxingPersistentStruct {
+//    func toObjects(context: NSManagedObjectContext) throws -> [NSManagedObject] {
+//        var objects:[NSManagedObject] = []
+//        for (idx, _) in enumerate() {
+//            let value = self[idx]
+//            let object = try value.toObject(context)
+//            objects.append(object)
+//        }
+//        return objects
+//    }
+    
+    mutating func box(object: NSManagedObject, withKey: String) throws {
+        let values = self.map { $0 as BoxingPersistentStruct }
+        var mutatedValues: [BoxingPersistentStruct] = []
+        var objects: [NSManagedObject] = []
         
+        for value in values {
+            var mutatedValue = value
+            objects.append(try mutatedValue.mutatingToObject(object.managedObjectContext))
+            mutatedValues.append(mutatedValue)
+        }
+        
+        let orderedSet = NSOrderedSet(array: objects)
+        
+        let mutableValue = object.mutableOrderedSetValueForKey(withKey)
+        if objects.count == 0 {
+            mutableValue.removeAllObjects()
+        } else {
+            mutableValue.intersectOrderedSet(orderedSet) // removes objects that are not in new array
+            mutableValue.unionOrderedSet(orderedSet) // adds new objects
+        }
+    }
+}
+
+public extension BoxingPersistentStruct {
+    
+    mutating func mutatingToObject(context: NSManagedObjectContext?) throws -> NSManagedObject {
         // Only create an entity, if it doesn't exist yet, otherwise update it
         // We can detect existing entities via the objectID property that is part of UnboxingStruct
         var result = try self.managedObject(context)
@@ -852,7 +950,9 @@ private func internalToObject<T: BoxingStruct>(context: NSManagedObjectContext?,
             }
             
             // If the value itself conforms to Boxing, we can just box it
-            if let value = valueMaybe as? Boxing {
+            if valueMaybe is BoxingPersistentStruct {
+                assertionFailure("Saving BoxingPersistentStruct using reflection is not supported. Please use custom mutatingToObject method to save the struct")
+            } else if let value = valueMaybe as? Boxing {
                 try value.box(result, withKey: label)
             } else {
                 // If this is a sequence type (optional or collection)
@@ -875,6 +975,7 @@ private func internalToObject<T: BoxingStruct>(context: NSManagedObjectContext?,
                     switch (optionalMirror.displayStyle, optionalMirror.children.first) {
                     case (.Collection?, _):
                         let values = optionalMirror.children.map { $0.value as? BoxingStruct }.filter { $0 != nil }.map { $0! }
+                        checkForPersistentStruct(values)
                         try internalCollectionToSet(context, result: result, label: label, values: values)
                     default:
                         if let value = child.value as? Boxing {
@@ -887,6 +988,7 @@ private func internalToObject<T: BoxingStruct>(context: NSManagedObjectContext?,
                 // A collection of objects
                 case (.Collection?, _):
                     let values = valueMirror.children.map { $0.value as? BoxingStruct }.filter { $0 != nil }.map { $0! }
+                    checkForPersistentStruct(values)
                     try internalCollectionToSet(context, result: result, label: label, values: values)
                 default:
                     // If we end up here, we were unable to decode it
@@ -900,9 +1002,15 @@ private func internalToObject<T: BoxingStruct>(context: NSManagedObjectContext?,
     throw CVManagedStructError.StructConversionError(message: "Object is not a struct: \(entity)")
 }
 
+private func checkForPersistentStruct(values: [BoxingStruct]){
+    let persistentStruct = values.filter { $0 is BoxingPersistentStruct }
+    if persistentStruct.count > 0 {
+        assertionFailure("Saving BoxingPersistentStruct using reflection is not supported. Please use custom mutatingToObject method to save the struct")
+    }
+}
+
 private func internalCollectionToSet(context: NSManagedObjectContext?, result: NSManagedObject, label: String, values: [BoxingStruct]) throws {
     let  objects: [NSManagedObject] = try values.map { value in  try value.toObject(context) }
-    
     let orderedSet = NSOrderedSet(array: objects)
     
     let mutableValue = result.mutableOrderedSetValueForKey(label)

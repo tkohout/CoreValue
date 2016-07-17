@@ -28,11 +28,11 @@ struct Author : CVManagedUniqueStruct {
             <^> o <| "name"
     }
     
-    func toObject(context: NSManagedObjectContext?) throws -> NSManagedObject {
-        return try self.managedObject(context)
-            |> ("id", self.id)
-            |> ("name", self.name)
-    }
+//    func toObject(context: NSManagedObjectContext?) throws -> NSManagedObject {
+//        return try self.managedObject(context)
+//            |> ("id", self.id)
+//            |> ("name", self.name)
+//    }
 }
 
 struct Article: CVManagedUniqueStruct {
@@ -54,12 +54,12 @@ struct Article: CVManagedUniqueStruct {
             <^> o <|? "author"
     }
     
-    func toObject(context: NSManagedObjectContext?) throws -> NSManagedObject {
-        return try self.managedObject(context)
-                |> ("id", self.id)
-                |> ("text", self.text)
-                ?|> ("author", self.author)
-    }
+//    func toObject(context: NSManagedObjectContext?) throws -> NSManagedObject {
+//        return try self.managedObject(context)
+//                |> ("id", self.id)
+//                |> ("text", self.text)
+//                ?|> ("author", self.author)
+//    }
 }
 
 struct Category: CVManagedUniqueStruct {
@@ -98,13 +98,13 @@ struct Category: CVManagedUniqueStruct {
             <^> o <|| "articles"
     }
     
-    func toObject(context: NSManagedObjectContext?) throws -> NSManagedObject {
-        return try self.managedObject(context)
-            |> ("id", self.id)
-            |> ("type", self.type)
-            |> ("label", self.label)
-            ||> ("articles", self.articles)
-    }
+//    func toObject(context: NSManagedObjectContext?) throws -> NSManagedObject {
+//        return try self.managedObject(context)
+//            |> ("id", self.id)
+//            |> ("type", self.type)
+//            |> ("label", self.label)
+//            ||> ("articles", self.articles)
+//    }
 }
 
 

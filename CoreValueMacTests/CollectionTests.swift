@@ -11,6 +11,7 @@ import CoreData
 
 
 struct StoredEmployee : CVManagedPersistentStruct {
+    typealias StructureType = StoredEmployee
     static let EntityName = "Employee"
     var objectID: NSManagedObjectID?
 
@@ -32,6 +33,7 @@ struct StoredEmployee : CVManagedPersistentStruct {
 }
 
 struct StoredCompany: CVManagedPersistentStruct {
+    typealias StructureType = StoredCompany
     static let EntityName = "Company"
     var objectID: NSManagedObjectID?
 
@@ -44,12 +46,30 @@ struct StoredCompany: CVManagedPersistentStruct {
             <^> o <| "name"
             <^> o <|| "employees"
     }
-
-    mutating func save(context: NSManagedObjectContext) throws {
-        try employees.saveAll(context)
-
-        try defaultSave(context)
+    
+    mutating func mutatingToObject(context: NSManagedObjectContext?) throws -> NSManagedObject {
+        
+        let o = try self.managedObject(context)
+        
+        self = try curry(self.dynamicType.init)
+                <^> nil
+                <^> o |> ("name", self.name)
+                <^> o ||> ("employees", self.employees)
+        
+        if let ctx = context {
+            try ctx.save()
+            // if it succeeded, update the objectID
+            self.objectID = o.objectID
+        }
+        
+        return o
     }
+
+//    mutating func save(context: NSManagedObjectContext) throws {
+//        try employees.saveAll(context)
+//
+//        try defaultSave(context)
+//    }
 }
 
 
