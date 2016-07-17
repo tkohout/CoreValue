@@ -81,7 +81,33 @@ That's it. Everything else it automated from here. Here're some examples of what
 	let shopObj = nsShop.mutatingToObject(self.context)
 	
 ```
+## Structs with identifier
 
+This struct supports boxing, unboxing based on its unique identifier. This can be especially useful when you are dealing with objects from remote api. In connection with Argo framework, CoreValue becomes lightweight but powerful API to CoreData mapping tool. 
+
+``` Swift
+struct Article: CVManagedUniqueStruct {
+    //Name of the Entity in CoreData
+    static let EntityName = "Article"
+
+    //Name of the identifier field in CoreData
+    static var IdentifierName: String = "id"
+
+    //Actual value of the identifier from the current struct
+    func IdentifierValue() -> IdentifierType { return self.id }
+
+    var id: Int16
+    var text: String
+    var author: Author?
+
+    static func fromObject(o: NSManagedObject) throws -> Article {
+        return try curry(self.init)
+            <^> o <| "id"
+            <^> o <| "text"
+            <^> o <|? "author"
+    }
+}
+```
 
 
 ## Querying
