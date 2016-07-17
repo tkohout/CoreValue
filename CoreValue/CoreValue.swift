@@ -40,6 +40,11 @@ infix operator <| { associativity left precedence 150 }
 infix operator <|| { associativity left precedence 150 }
 infix operator <|? { associativity left precedence 150 }
 
+//put value to nsmanagedobject
+infix operator |> { associativity left precedence 150 }
+infix operator ?|> { associativity left precedence 150 }
+infix operator ||> { associativity left precedence 150 }
+
 public func <^> <A, B>(f: ((A) throws -> B), a: A) rethrows -> B {
     return try f(a)
 }
@@ -61,6 +66,23 @@ public func <|| <A where A: Unboxing, A == A.StructureType>(value: NSManagedObje
     } else {
         throw NSError(unboxErrorMessage: "\(key) \(A.self)")
     }
+}
+
+public func |> <A where A: Boxing>(object: NSManagedObject, boxed: (key: String, value: A)) throws -> NSManagedObject {
+    try boxed.value.box(object, withKey: boxed.key)
+    return object
+}
+
+public func ?|> <A where A: Boxing>(object: NSManagedObject, boxed: (key: String, value: A?)) throws -> NSManagedObject {
+    if let value = boxed.value {
+        try value.box(object, withKey: boxed.key)
+    }
+    return object
+}
+
+public func ||> <A where A: BoxingStruct>(object: NSManagedObject, boxed: (key: String, values: Array<A>)) throws -> NSManagedObject {
+    try boxed.values.box(object, withKey: boxed.key)
+    return object
 }
 
 /**
@@ -577,14 +599,14 @@ private func virginObjectForEntity(entity: String, context: NSManagedObjectConte
     return NSManagedObject(entity: desc!, insertIntoManagedObjectContext: context)
 }
 
-private extension BoxingStruct {
-    private func managedObject(context: NSManagedObjectContext?) throws -> NSManagedObject {
+public extension BoxingStruct {
+    public final func managedObject(context: NSManagedObjectContext?) throws -> NSManagedObject {
         return virginObjectForEntity(self.dynamicType.EntityName, context: context)
     }
 }
 
-private extension BoxingPersistentStruct {
-    private func managedObject(context: NSManagedObjectContext?) throws -> NSManagedObject {
+public extension BoxingPersistentStruct {
+    public final func managedObject(context: NSManagedObjectContext?) throws -> NSManagedObject {
         if let objectID = self.objectID,
            ctx = context {
             do {
@@ -600,12 +622,6 @@ private extension BoxingPersistentStruct {
     }
 }
 
-private extension BoxingUniqueStruct {
-    
-    
-    
-   
-}
 
 public extension BoxingUniqueStruct {
     
@@ -684,44 +700,44 @@ public extension Array where Element: BoxingUniqueStruct {
     /**
      Converts array to objects using one fetch request
      */
-    func toObjects(context: NSManagedObjectContext) throws -> [NSManagedObject] {
-        var predicates: [NSPredicate] = []
-        var objects: [NSManagedObject] = []
-        
-        for (idx, _) in enumerate() {
-            predicates.append(try self[idx].identifierPredicate())
-        }
-        
-        let predicate = NSCompoundPredicate(orPredicateWithSubpredicates: predicates)
-        
-        let fetchRequest = NSFetchRequest(entityName: Element.EntityName)
-        fetchRequest.predicate = predicate
-        
-        let fetchResults = try context.executeFetchRequest(fetchRequest)
-        
-        for (idx, _) in enumerate() {
-            let object = self[idx]
-            
-            var managedObject: NSManagedObject
-            
-            let singlePredicate = try object.identifierPredicate()
-            
-            //let resultsWithIdentifier = fetchResults.filter { object.IdentifierValue() as! String == $0.valueForKey(Element.IdentifierName) as! String }
-            
-            let resultsWithIdentifier = fetchResults.filter { singlePredicate.evaluateWithObject($0) }
-            
-            if let fetchedObject = resultsWithIdentifier.first as? NSManagedObject {
-                managedObject = fetchedObject
-            }else {
-                managedObject = virginObjectForEntity(Element.EntityName, context: context)
-            }
-            
-            managedObject = try internalToObject(context, result: managedObject, entity: object)
-            objects.append(managedObject)
-        }
-        
-        return objects
-    }
+//    func toObjects(context: NSManagedObjectContext) throws -> [NSManagedObject] {
+//        var predicates: [NSPredicate] = []
+//        var objects: [NSManagedObject] = []
+//        
+//        for (idx, _) in enumerate() {
+//            predicates.append(try self[idx].identifierPredicate())
+//        }
+//        
+//        let predicate = NSCompoundPredicate(orPredicateWithSubpredicates: predicates)
+//        
+//        let fetchRequest = NSFetchRequest(entityName: Element.EntityName)
+//        //fetchRequest.predicate = predicate
+//        
+//        let fetchResults = try context.executeFetchRequest(fetchRequest)
+//        
+//        for (idx, _) in enumerate() {
+//            let object = self[idx]
+//            
+//            var managedObject: NSManagedObject
+//            
+//            let singlePredicate = try object.identifierPredicate()
+//            
+//            //let resultsWithIdentifier = fetchResults.filter { object.IdentifierValue() as! String == $0.valueForKey(Element.IdentifierName) as! String }
+//            
+//            let resultsWithIdentifier = fetchResults.filter { singlePredicate.evaluateWithObject($0) }
+//            
+//            if let fetchedObject = resultsWithIdentifier.first as? NSManagedObject {
+//                managedObject = fetchedObject
+//            }else {
+//                managedObject = virginObjectForEntity(Element.EntityName, context: context)
+//            }
+//            
+//            managedObject = try internalToObject(context, result: managedObject, entity: object)
+//            objects.append(managedObject)
+//        }
+//        
+//        return objects
+//    }
     
     func saveAll(context: NSManagedObjectContext) throws {
         try self.toObjects(context)
@@ -734,6 +750,23 @@ public extension BoxingStruct {
         let result = try self.managedObject(context)
         
         return try internalToObject(context, result: result, entity: self)
+    }
+}
+
+public extension Array where Element : BoxingStruct {
+    func toObjects(context: NSManagedObjectContext) throws -> [NSManagedObject] {
+        var objects:[NSManagedObject] = []
+        for (idx, _) in enumerate() {
+            let value = self[idx]
+            let object = try value.toObject(context)
+            objects.append(object)
+        }
+        return objects
+    }
+    
+    func box(object: NSManagedObject, withKey: String) throws {
+        let values = self.map { $0 as BoxingStruct }
+        try internalCollectionToSet(object.managedObjectContext, result: object, label: withKey, values: values)
     }
 }
 
@@ -841,7 +874,8 @@ private func internalToObject<T: BoxingStruct>(context: NSManagedObjectContext?,
                     
                     switch (optionalMirror.displayStyle, optionalMirror.children.first) {
                     case (.Collection?, _):
-                        try internalCollectionToSet(context, result: result, label: label, mirror: optionalMirror)
+                        let values = optionalMirror.children.map { $0.value as? BoxingStruct }.filter { $0 != nil }.map { $0! }
+                        try internalCollectionToSet(context, result: result, label: label, values: values)
                     default:
                         if let value = child.value as? Boxing {
                             try value.box(result, withKey: label)
@@ -852,7 +886,8 @@ private func internalToObject<T: BoxingStruct>(context: NSManagedObjectContext?,
                     }
                 // A collection of objects
                 case (.Collection?, _):
-                    try internalCollectionToSet(context, result: result, label: label, mirror: valueMirror)
+                    let values = valueMirror.children.map { $0.value as? BoxingStruct }.filter { $0 != nil }.map { $0! }
+                    try internalCollectionToSet(context, result: result, label: label, values: values)
                 default:
                     // If we end up here, we were unable to decode it
                     throw CVManagedStructError.StructValueError(message: "Could not decode value for field '\(label)' obj \(valueMaybe)")
@@ -865,13 +900,8 @@ private func internalToObject<T: BoxingStruct>(context: NSManagedObjectContext?,
     throw CVManagedStructError.StructConversionError(message: "Object is not a struct: \(entity)")
 }
 
-private func internalCollectionToSet(context: NSManagedObjectContext?, result: NSManagedObject, label: String, mirror: Mirror) throws {
-    var objects: [NSManagedObject] = []
-    for (_, value) in mirror.children {
-        if let boxedValue = value as? BoxingStruct {
-            objects.append(try boxedValue.toObject(context))
-        }
-    }
+private func internalCollectionToSet(context: NSManagedObjectContext?, result: NSManagedObject, label: String, values: [BoxingStruct]) throws {
+    let  objects: [NSManagedObject] = try values.map { value in  try value.toObject(context) }
     
     let orderedSet = NSOrderedSet(array: objects)
     

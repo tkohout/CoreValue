@@ -27,6 +27,7 @@
 		4D6AEB9B1B4DEAE100DDD5E1 /* curry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D6AEB981B4DEAE100DDD5E1 /* curry.swift */; };
 		4D6AEB9C1B4DEAE100DDD5E1 /* curry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D6AEB981B4DEAE100DDD5E1 /* curry.swift */; };
 		AC90177A1D3AE28100F33670 /* UniqueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC9017791D3AE28100F33670 /* UniqueTests.swift */; };
+		AC90177B1D3BBC1300F33670 /* CollectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F13B6DD1C79EF000099947C /* CollectionTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -378,6 +379,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AC90177A1D3AE28100F33670 /* UniqueTests.swift in Sources */,
+				AC90177B1D3BBC1300F33670 /* CollectionTests.swift in Sources */,
 				4D391F261B5404CE00C66C90 /* CoreValueTests.xcdatamodel in Sources */,
 				4D391F251B5404C300C66C90 /* CoreValueTests.swift in Sources */,
 				4D5912741B498A170022506E /* CoreValue.swift in Sources */,

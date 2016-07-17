@@ -27,6 +27,12 @@ struct Author : CVManagedUniqueStruct {
             <^> o <| "id"
             <^> o <| "name"
     }
+    
+    func toObject(context: NSManagedObjectContext?) throws -> NSManagedObject {
+        return try self.managedObject(context)
+            |> ("id", self.id)
+            |> ("name", self.name)
+    }
 }
 
 struct Article: CVManagedUniqueStruct {
@@ -46,6 +52,13 @@ struct Article: CVManagedUniqueStruct {
             <^> o <| "id"
             <^> o <| "text"
             <^> o <|? "author"
+    }
+    
+    func toObject(context: NSManagedObjectContext?) throws -> NSManagedObject {
+        return try self.managedObject(context)
+                |> ("id", self.id)
+                |> ("text", self.text)
+                ?|> ("author", self.author)
     }
 }
 
@@ -83,6 +96,14 @@ struct Category: CVManagedUniqueStruct {
             <^> o <| "type"
             <^> o <| "label"
             <^> o <|| "articles"
+    }
+    
+    func toObject(context: NSManagedObjectContext?) throws -> NSManagedObject {
+        return try self.managedObject(context)
+            |> ("id", self.id)
+            |> ("type", self.type)
+            |> ("label", self.label)
+            ||> ("articles", self.articles)
     }
 }
 
@@ -129,7 +150,7 @@ class UniqueTests: XCTestCase {
     var manyCategories: [Category] = {
         var box: [Article] = []
         for c in 0..<25 {
-            box.append(Article(id: Int16(c), text: "text_\(c)", author: Author(id: "dfaw87", name: "Dostojevsky")))
+            box.append(Article(id: Int16(c), text: "text_\(c)", author: nil))
         }
         var companyBox: [Category] = []
         for c in 0..<50 {
